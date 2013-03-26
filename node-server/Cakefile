@@ -1,0 +1,79 @@
+fs = require 'fs'
+colors = require 'colors'
+{exec} = require 'child_process'
+log = console.log
+
+# Settings object containing the directory structures for a project	
+# It can also contain the remote directory
+settings =
+	server:
+		src: './src/coffee/server'
+		dest: './'
+	client:
+		src: './src/coffee/client/'
+		dest: './www/js/'
+	styles:
+		src: './src/styl/'
+		dest: './www/css/'
+	jade:
+		src: './src/jade'
+		dest: './'
+	test:
+		src: './src/test'
+		dest: './test'
+		suite: 'mocha'
+	remote: 'example:location/folder'
+
+# Command line Options
+
+option '-m', '--message [COMMIT_MESSAGE]', 'set git commit message'
+
+task 'build', 'build app', ->
+	console.log settings
+
+task 'build:server', 'build server files', ->
+	# Compile coffee from source directory.
+	# As this is the server the order is not imporant
+	# and this may be done asynchronously
+	exec "coffee --compile --output 
+	#{ settings.server.dest } 
+	#{ settings.server.src }", (err, stdout, stderr) ->
+		err && throw err
+		log 'Server Completed'.green
+
+task 'test', 'build test files', ->
+	# Compile coffee from source directory.
+	# As these are the tests the order is not imporant
+	# and this may be done asynchronously
+	exec "coffee --compile --output 
+	#{ settings.test.dest } 
+	#{ settings.test.src }", (err, stdout, stderr) ->
+		err && throw err
+		log 'Tests Compiled'.green
+		log 'Running Tests'.rainbow
+		exec "#{settings.test.suite}", (err, stdout, stderr) ->
+			err && log(err.underline.red)
+			log "#{stdout} #{stderr}"
+			log 'Tests Complete'.green
+
+task 'ship', 'push files to server', ->
+	# Execute Unix Rsync command over SHH to the remote int he settings file
+	# Exclude both the .git folder and node modules
+	exec "rsync -avzP --exclude .git --exclude node_modules . 
+	#{settings.remote} ", (err, stdout, stderr) ->
+		log "#{stdout}  #{stderr}".underline.red
+		err && throw err
+		log 'Ship Completed'.green
+
+task 'commit', 'commit all files in the project', (options) ->
+	message = options.message || 'Auto commited'
+	# Using cake ensures that git add . is executed
+	# from the root of the directory.
+	exec 'git add -f *;', (err, stdout, stderr) ->
+		err && log(err.red.underline)
+		log "#{stdout} #{stderr}".cyan.bold
+		exec "git commit -am '#{message}'", (err, stdout, stderr) ->
+			err && log(err.underline.red)
+			log "#{stdout} #{stderr}".cyan.bold
+			log 'Commit Complete'.green
+
